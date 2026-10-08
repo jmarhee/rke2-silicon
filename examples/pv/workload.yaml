@@ -1,0 +1,63 @@
+# Instrument drop. The PersistentVolume is a directory that already exists on
+# the Mac. The agent exports it into the pod with virtiofs. The claim binds to
+# this volume by name. storageClassName manual has no provisioner.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: bench
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /Users/Shared/rke2-silicon/bench
+    type: Directory
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bench
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  volumeName: bench
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bench
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bench
+  template:
+    metadata:
+      labels:
+        app: bench
+    spec:
+      containers:
+        - name: parser
+          image: docker.io/library/busybox:1.36
+          volumeMounts:
+            - name: report
+              mountPath: /report
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -eu
+              printf 'parsed %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /report/drop.txt
+              sleep 3600
+      volumes:
+        - name: report
+          persistentVolumeClaim:
+            claimName: bench

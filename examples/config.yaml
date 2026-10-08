@@ -1,0 +1,13 @@
+kubernetes-version: v1.36.4+rke2r1
+node-name: dreamland
+node-ip: 192.168.1.20
+# Unused on 192.168.0.0/24 when chosen. Keep it out of DHCP.
+ingress-address: 192.168.0.200
+tls-san:
+  - 192.168.1.20
+# Flags appended after the installer's own. A repeated flag is the one the process uses.
+# kube-apiserver-arg:
+#   - audit-log-maxage=30
+# etcd-arg: []
+# kube-controller-manager-arg: []
+# kube-scheduler-arg: []

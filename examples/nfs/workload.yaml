@@ -1,0 +1,52 @@
+# Condition monitoring. The pod appends readings to a file on the claim.
+# The provisioner creates a directory on the export for this claim.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: meter-log
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meter-log
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meter-log
+  template:
+    metadata:
+      labels:
+        app: meter-log
+    spec:
+      containers:
+        - name: meter
+          image: docker.io/library/busybox:1.36
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -eu
+              out=/data/readings.csv
+              if [ ! -s "$out" ]; then
+                printf 'time,source,value\n' > "$out"
+              fi
+              while true; do
+                printf '%s,meter-1,1\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$out"
+                sleep 15
+              done
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: meter-log

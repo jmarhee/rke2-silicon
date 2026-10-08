@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gpu-sample
+spec:
+  restartPolicy: Never
+  containers:
+    - name: sample
+      image: docker.io/curlimages/curl:8.12.1
+      resources:
+        limits:
+          apple.com/gpu: "1"
+      command: ["sh", "-c"]
+      args:
+        - |
+          set -eu
+          auth="Authorization: Bearer ${RKE_MACOS_GPU_TOKEN}"
+          echo "device"
+          curl -fsS -H "${auth}" "${RKE_MACOS_GPU_URL}/v1/device"
+          echo
+          echo "compute"
+          curl -fsS \
+            -H "${auth}" \
+            -H "X-Rke-Gpu-Shares: ${RKE_MACOS_GPU_SHARES}" \
+            -H "Content-Type: application/json" \
+            -d '{"values":[1,2,3,4]}' \
+            "${RKE_MACOS_GPU_URL}/v1/compute"
+          echo
