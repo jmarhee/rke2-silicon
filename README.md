@@ -6,11 +6,22 @@ The node is for work that pulls or reads here, processes on this Mac, and writes
 
 ## What runs
 
-The RKE2 installer is not in this tree and is never executed. [docs/rke2.md](docs/rke2.md) is the relationship to an RKE2 release and to a traditional installation. There is no `rke2` binary, install script, containerd, or kubelet. `up` writes certificates on the Mac, mounts `~/.rke2-silicon` at `/var/lib/rke2-silicon`, and starts the component binaries from Rancher's hardened images as Apple containers. An RKE2 release is `etcd`, `kube-apiserver`, `kube-controller-manager`, and `kube-scheduler`. `config.yaml` uses RKE2's keys. Those keys become process arguments. The processes do not read the file. `kubernetes-version` selects the catalog image.
+The RKE2 installer is not in this tree and is never executed. [docs/rke2.md](docs/rke2.md) is the relationship to an RKE2 release and to a traditional installation. There is no `rke2` binary, install script, containerd, or kubelet.
 
-The LaunchAgent is the kubelet. It heartbeats the node and starts each pod as a container. CNI, kube-proxy, CoreDNS, and the RKE2 charts are not installed. Traefik is a Deployment this installer applies.
+`kubernetes-version` selects a row in the catalog. A version that is absent fails. That row names the container images Rancher publishes for the release. For `v1.36.4+rke2r1` they are `docker.io/rancher/hardened-kubernetes:v1.36.4-rke2r1-build20260821` and `docker.io/rancher/hardened-etcd:v3.6.14-k3s1-build20260819`. `up` writes certificates on the Mac, mounts `~/.rke2-silicon` at `/var/lib/rke2-silicon`, and starts four containers. The Apple `container` CLI pulls an image the first time that name is started. Each container runs one binary from the image:
 
-A K3s release is one container, `rke2-silicon-k3s`, running `k3s server`. The agent, Flannel, and the packaged charts stay disabled. The same LaunchAgent starts pods.
+| Process | Image | Binary |
+| --- | --- | --- |
+| etcd | hardened-etcd | `/usr/local/bin/etcd` |
+| kube-apiserver | hardened-kubernetes | `/usr/local/bin/kube-apiserver` |
+| kube-controller-manager | hardened-kubernetes | `/usr/local/bin/kube-controller-manager` |
+| kube-scheduler | hardened-kubernetes | `/usr/local/bin/kube-scheduler` |
+
+`config.yaml` uses RKE2's keys. Those keys become process arguments. The processes do not read the file.
+
+When the apiserver answers, `up` creates the node and the ConfigMap `kube-system/rke2-silicon-version` through the API. The LaunchAgent is the kubelet. It heartbeats the node and starts each pod as a container. CNI, kube-proxy, CoreDNS, and the RKE2 charts are not installed. Traefik is a Deployment this installer applies.
+
+A K3s release is the catalog row `v1.36.4+k3s1`, image `docker.io/rancher/k3s:v1.36.4-k3s1`, and one container, `rke2-silicon-k3s`, running `k3s server`. The agent, Flannel, and the packaged charts stay disabled. The same LaunchAgent starts pods. A later `up` with the same version leaves the running containers in place. Moving to another catalog row is `upgrade`.
 
 ## Registry token realms
 
@@ -85,7 +96,12 @@ go build -o rke2-silicon ./cmd/rke2-silicon
 ./rke2-silicon up --config config.yaml
 export KUBECONFIG=$HOME/.rke2-silicon/rke2-silicon.yaml
 kubectl get --raw=/readyz
+kubectl get nodes -o wide
 ```
+
+`/readyz` returns `ok`. The node is Ready. `VERSION` is the catalog release. `CONTAINER-RUNTIME` is the Apple container CLI.
+
+![kubectl get nodes -o wide, dreamland Ready on container 1.4.1](docs/node-ready.jpg)
 
 `up` creates the `rke2-silicon` network on first start. A later `up` with the same images leaves a healthy cluster in place. `stop` and `down` stop containers named `rke2-silicon-*` and containers on the `rke2-silicon` network. `uninstall` deletes those containers, including ones that are already stopped. `~/.rke2-silicon` and the alias stay. `--purge` on `stop`, `down`, or `uninstall` deletes the containers, that network, `~/.rke2-silicon`, the ingress alias, the LaunchAgent, and the forwarder. `upgrade` snapshots the datastore, then rolls images. It rejects a downgrade and a jump of more than one Kubernetes minor.
 
